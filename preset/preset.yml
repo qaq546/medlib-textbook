@@ -1,0 +1,2 @@
+﻿name: 医学教材电子化
+description: 医学教材电子化专用 Agent:通过 MinerU 云端 API 把 PDF/PPT/Word 教材转成 Markdown 文库,支持全文检索与按章查阅。基于标准编码 Agent 能力。

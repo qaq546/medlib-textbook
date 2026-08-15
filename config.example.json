@@ -1,0 +1,5 @@
+{
+  "bridge": "/absolute/path/to/medlib-bridge.mjs",
+  "workDir": "/absolute/path/to/work-dir",
+  "libraryDir": "/absolute/path/to/your-library"
+}
