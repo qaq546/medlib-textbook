@@ -2,8 +2,6 @@
 
 > 日常使用说明见 QUICKSTART.md(新会话怎么用、常用操作小抄)。
 
-# 医学教材电子化(Medlib)
-
 把医学教材(PDF/PPT/Word/图片)通过 MinerU 云端 API 转成 Markdown 文库,支持全文检索与按章查阅。
 
 ## 资源与约定
