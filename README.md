@@ -19,7 +19,7 @@
 | 断点续转 | 任务状态持久化在 `<文库>/library.json`,中途失败可从 `medlib_poll` 续查 |
 | 全文检索 | 按关键字检索命中的书、文件、行号与上下文(精确到行) |
 | 图片瘦身 | `trim-images` 清理头像 / logo / 图标等误识别小图(默认 < 8KB)并同步移除引用 |
-| 校对重构 | `medfix.py` 对照原版 PDF 文本层逐字校对,修复 OCR 错字 / 断词 / 缺文,重建「章/节/条/项/细分」五级标题,HTML 表格转 GFM,图注标准化,按官方书签重建带锚点与页码的目录 |
+| 校对重构 | `medfix.py` 对照原版 PDF 文本层逐字校对,修复 OCR 错字 / 断词 / 缺文,重建「章/节/条/项/细分」五级标题,HTML 表格转 GFM,图注标准化;**图片按「图X-Y」图注归档为 `images/figX-Y.png` 并回插引用**(面板图 a/b/c,缺失占位符 `[图X-Y]`,无 base64),按官方书签重建**无页码**目录(锚点 + 链接),输出前自检(图数=注数、无残留 `$`) |
 | Harness 集成 | 提供 DeepSeek Harness(DSH)动态插件源码与 Agent Preset,7 个 medlib_* 工具开箱即用 |
 
 ---
@@ -39,8 +39,15 @@ medlib-textbook/
 │   └── assets/medlib-bridge.mjs # 随 preset 分发的桥接脚本副本
 ├── tools/
 │   ├── medfix.py                # Markdown 校对重构流水线(需 PyMuPDF)
+│   ├── round5-fix.py            # 已处理分片的图片归档/目录去页码/公式清理补丁
+│   ├── postprocess.py           # 后处理流水线驱动(串联 fix-tables→fix-common→verify→backfill→双审计)
+│   ├── fix-tables.py            # 复杂合并单元格表转 HTML(rowspan/colspan 还原)
+│   ├── fix-common.py            # 通用字符规范层(离子上下标/比值冒号/乘号,对所有教材生效)
+│   ├── verify-tables.py         # 表格列宽校验
+│   ├── backfill-punct.py        # 纯标点回填(对照 PDF 文本层,含包含验证)
 │   ├── audit-para.py            # 段落级全文包含审计(严格模式,抓拼接/丢标点/前置页错误)
 │   ├── audit-para-lenient.py    # 段落级全文包含审计(括号归一版,区分标点型/内容型差异)
+│   ├── specs/                   # postprocess 换书填写说明与模板
 │   └── gen-pdf.mjs              # 合成 PDF 测试工具(验证分片/合并)
 ├── docs/
 │   └── MINERU_API.md            # MinerU 云端 API 对接要点与踩坑记录
@@ -141,12 +148,13 @@ MinerU 标准 API v4 的完整流程(与插件 `medlib_convert / poll / fetch` �
 MinerU 输出通常存在系统性问题:标题全部是 `##`、部分表格是 HTML、公式带 LaTeX 垃圾命令、OCR 单字错、英文断词、图片链接冗长。`medfix.py` 针对单个分片做全自动修复:
 
 - **文字校对**:逐章与 PDF 文本层做 SequenceMatcher 差异比对,输出候选错误清单并修复(错字、断词、缺文补回、`PaC0₂→PaCO₂` 等数字字母混淆)
-- **医学符号**:540 处 `$...$` 公式 → Unicode(`HCO₃⁻`、`PaCO₂`、`Na⁺`、`1,25-(OH)₂D₃`、`P₅₀`…);34 处 HTML 上/下标 → Unicode;清理 `\bf \mathbf \mathbb \substack` 等残渣命令;保留标准写法 `$\bar{x} \pm s$`
+- **医学符号**:540 处 `$...$` 公式 → Unicode(`HCO₃⁻`、`PaCO₂`、`Na⁺`、`1,25-(OH)₂D₃`、`P₅₀`…);34 处 HTML 上/下标 → Unicode;清理 `\bf \mathbf \mathbb \substack` 等残渣命令;保留标准写法 `$\bar{x} \pm s$`;纯文本 `$$` 块自动去包裹(Z 评分等真 LaTeX 展示公式保留)
 - **标题层级**:按「`#` 章 / `##` 节 / `###` 一、 / `####`（一）与【】 / `#####` 1.」五级重排(缺失章标题自动补入)
-- **表格**:HTML `<table>`(含 rowspan/colspan)→ 标准 GFM 表格;表内半角标点转全角
-- **图片**:删除 `![](images/…)` 链接,仅保留加粗图注 `**图X-X　名称**`;表题同步加粗
-- **目录**:用 PDF 官方书签重建 `# 目录`(锚点 + 原版页码;印刷页码 = PDF 页码 − 前置偏移,需按书校准)
-- **冗余清理**:分片注释、页脚残留、连续空行、尾随空格、被分页切断的续句合并
+- **表格**:HTML `<table>`(含 rowspan/colspan)→ 标准 GFM 表格;表内半角标点转全角(复杂合并单元格表由 `fix-tables.py` 恢复为 HTML)
+- **图片**:按「图X-Y」图注归档——引用行 `![](images/<hash>…)` 重写为 `![图X-Y](images/figX-Y.png)`(面板图 `figX-Y-a/b/c.png`),图注加粗 `**图X-Y　名称**` 保留在图片下方,缺失文件插占位符 `[图X-Y]`,无图注图片(封面/编者照片/logo/二维码/视频缩略图/思维导图)剔除
+- **目录**:用 PDF 官方书签重建 `# 目录`,只保留 `- [标题](#锚点)`,**不输出原书页码**
+- **输出自检**:图引用数 = 图注数、无残留 `$`、无 base64、无哈希引用残留
+- **冗余清理**:分片注释、页脚残留、连续空行、尾随空格、被分页切断的续句合并(含「分为/包括/如下」结尾断段)
 - **二次校验**:`tools/audit-para.py` 把每个正文段落与 PDF 文本层做归一化子串比对,能捕获字符级 diff 漏掉的**行拼接丢标点、跨章节拼接、无中文的公式错乱、前置页错误**;`audit-para-lenient.py` 为括号归一版,两者未命中数之差即纯标点问题
 
 依赖与使用:
@@ -157,6 +165,7 @@ python tools/medfix.py         # 头部 SRC/OUT/OUTLINE 等常量按你的文件
 ```
 
 > 该脚本以《儿科学》p1-200 分片为实例编写,路径常量在文件头部,替换后即可用于任意教材分片。
+> 已处理过但未做图片归档的旧 md,可用 `tools/round5-fix.py` 补丁(图片回插 / 目录去页码 / 公式清理,同样头部改路径)。
 
 ---
 

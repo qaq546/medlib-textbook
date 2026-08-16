@@ -1,25 +1,16 @@
 # -*- coding: utf-8 -*-
-"""medfix.py — 教材 Markdown 分片「校对重构」流水线(模板)。
-
-对 MinerU 云端转换出的分片 md 做全自动修复:
-  1) 文字校对:逐章与 PDF 文本层差异比对,修复 OCR 错字/断词/缺文
-  2) 医学符号:$...$ 公式 -> Unicode(HCO₃⁻、PaCO₂、Na⁺…),HTML 上/下标 -> Unicode
-  3) 标题层级:按 章# / 节## / 条### / 项#### / 细分##### 五级重排
-  4) 表格:HTML <table>(含 rowspan/colspan) -> 标准 GFM 表格
-  5) 图片:删除 ![](images/..) 链接,仅保留 **图X-X 名称**;表题同步加粗
-  6) 目录:按 PDF 官方书签(outline.json)重建 # 目录(锚点 + 原版页码)
-  7) 冗余清理:分片注释、页脚残留、连续空行、续句合并等
-
-依赖:Python 3 + PyMuPDF(pip install pymupdf)。
-用法:把下方 SRC/OUT/OUTLINE 常量改为你的文件路径后 `python medfix.py`;
-      另用 diff_pdf.py 的思路可把「PDF 文本层 vs md」差异报告单独导出供人工复核。
-"""
-import io, re, os, json
+"""medfix.py — 儿科学 p1-200 分片规范化与重构主脚本(Stage A-E, H-I)。
+规则 1-5/16-17/23:图片按图注归档 figX-Y.png 并回插引用;目录不输出原书页码;
+纯文本 $$ 块去包裹;图注兼容 '图 X-Y' 空格形态;输出前自检。"""
+import io, re, os, json, shutil
 
 WORK = r"F:\Develop\DeepSeek-Harness\Agent\Plugins\py-libs\work"
 SRC = os.path.join(WORK, "24儿科学 第10版-p1-200-raw.md")
 OUT = os.path.join(WORK, "24儿科学 第10版-p1-200-norm.md")
 OUTLINE = r"F:\Develop\DeepSeek-Harness\Agent\Plugins\py-libs\pdfwork\outline.json"
+# MinerU 哈希原图目录 / fig 图片输出目录(按书修改)
+IMG_SRC = r"F:\Develop\MedicalTextbooks\md\24儿科学 第10版\images"
+IMG_DST = IMG_SRC
 
 # ---------- 工具函数 ----------
 
@@ -274,6 +265,156 @@ def convert_tables(text):
     out.append(text[pos:])
     return ''.join(out)
 
+# ---------- 图片回插(规则 1-5):按图注命名 figX-Y.png 并插入引用 ----------
+
+def build_fig_map(lines):
+    """从分片原始行构建 图注 -> [哈希] 映射(带图注的图片块;面板图多图一注)。"""
+    fig_map = {}
+    n = len(lines)
+    i = 0
+    while i < n:
+        if not lines[i].strip().startswith('!['):
+            i += 1
+            continue
+        hashes = []
+        j = i
+        while j < n:
+            t = lines[j].strip()
+            if not t:
+                j += 1
+                continue
+            if re.match(r'^[A-Z]$', t):   # 面板标签,继续找后续图
+                j += 1
+                continue
+            m = re.search(r'images/([0-9a-f]+)\.(?:jpg|jpeg|png)', t)
+            if m:
+                hashes.append(m.group(1))
+                j += 1
+                continue
+            break
+        cap = None
+        k, looked = j, 0
+        while k < n and looked < 12:
+            t = lines[k].strip()
+            if not t:
+                k += 1
+                continue
+            if t.startswith('!['):
+                break
+            looked += 1
+            m = re.match(r'^图\s*(\d+-\d+[A-Z]?)\s*[　 \u3000\u2003\u2002\t ]+', t)
+            if m:
+                cap = m.group(1)
+                break
+            if re.match(r'^[A-Z]$', t):
+                k += 1
+                continue
+            break
+        if cap and hashes:
+            fig_map[cap] = hashes
+        i = j
+    return fig_map
+
+def fig_dst_name(cap, idx):
+    if idx == 0:
+        return 'fig%s.png' % cap
+    return 'fig%s-%s.png' % (cap, chr(ord('a') + idx - 1))
+
+def convert_to_png(src, dst):
+    """fitz 转 PNG;失败则复制字节。"""
+    try:
+        import fitz
+        pix = fitz.Pixmap(src)
+        if pix.n - (pix.alpha or 0) > 3:
+            pix = fitz.Pixmap(fitz.csRGB, pix)
+        pix.save(dst)
+        return True
+    except Exception:
+        try:
+            shutil.copyfile(src, dst)
+            return True
+        except Exception:
+            return False
+
+def insert_figures(text, fig_map):
+    """在文本中:图片引用插到图注行上方(命名 figX-Y.png),图注统一加粗;
+    无对应图注的图片引用不处理(调用方已丢弃)。"""
+    lines = text.split('\n')
+    cap_idx = {}
+    for cap in fig_map:
+        for i, l in enumerate(lines):
+            s = re.sub(r'\*{0,2}$', '', re.sub(r'^\*{0,2}', '', l.strip()))
+            if re.match(r'^图\s*' + re.escape(cap) + r'[A-Z]?\s*[　 \u3000\u2003\u2002\t ]+', s):
+                cap_idx[cap] = i
+                break
+    blocks = {}
+    for cap, ci in cap_idx.items():
+        labels, annots, top = [], [], ci
+        j = ci - 1
+        while j >= 0:
+            s = lines[j].strip()
+            if s == '':
+                j -= 1
+                continue
+            if re.match(r'^[A-Z]$', s):
+                labels.insert(0, s)
+                top = j
+                j -= 1
+                continue
+            if (len(s) <= 60 and not re.search(r'[。；：、，,]$', s)
+                    and not s.startswith(('#', '|', '-', '!', '（', '('))
+                    and not s.startswith('**图') and not re.match(r'^图\s*\d', s)):
+                annots.insert(0, s)
+                top = j
+                j -= 1
+                continue
+            break
+        blocks[cap] = (top, ci, labels, annots)
+    consumed = set()
+    for top, ci, labels, annots in blocks.values():
+        consumed.update(range(top, ci))
+    rev = {ci: cap for cap, ci in cap_idx.items()}
+    out = []
+    i, n = 0, len(lines)
+    while i < n:
+        if i in rev:
+            cap = rev[i]
+            top, ci, labels, annots = blocks[cap]
+            block = []
+            for idx, h in enumerate(fig_map[cap]):
+                name = fig_dst_name(cap, idx)
+                src = os.path.join(IMG_SRC, h + '.jpg')
+                if not os.path.exists(src):
+                    alt = os.path.join(IMG_SRC, h + '.png')
+                    if os.path.exists(alt):
+                        src = alt
+                dst = os.path.join(IMG_DST, name)
+                ok = os.path.exists(dst) or convert_to_png(src, dst)
+                if ok:
+                    block.append('![图%s](images/%s)' % (cap, name))
+                else:
+                    block.append('[图%s]' % cap)   # 规则 4 占位符
+                if idx < len(labels):
+                    block.append(labels[idx])
+                block.append('')
+            for a in annots:
+                block.append(a)
+                block.append('')
+            raw_l = lines[i].strip()
+            core = raw_l[2:-2] if raw_l.startswith('**') and raw_l.endswith('**') else raw_l
+            core = re.sub(r'^图\s*(\d+-\d+[A-Z]?)\s*[　 \u3000\u2003\u2002\t ]+',
+                          lambda m: '图%s　' % m.group(1), core)
+            block.append('**%s**' % core)
+            out.extend(block)
+            i += 1
+            continue
+        if i in consumed:
+            i += 1
+            continue
+        out.append(lines[i])
+        i += 1
+    return '\n'.join(out)
+
 # ---------- 锚点 ----------
 
 def make_anchor(title):
@@ -331,17 +472,14 @@ def build_toc(outline_path, raw_lines, body_lines):
         p = printed(pg)
         indent = '  ' * (lvl - 1)
         link = '[%s](#%s)' % (disp, make_anchor(disp))
-        line = '%s- %s' % (indent, link)
-        if p is not None:
-            line += ' …… %d' % p
-        out.append(line)
+        out.append('%s- %s' % (indent, link))   # 规则 16/17:不输出原书页码
     # 附加:原书目录里的特殊条目(数字创新)
     out.append('')
     out.append('【数字创新：虚拟仿真数字人】')
     for i, l in enumerate(raw_lines):
         ls = l.strip()
         if ls.startswith('数字人案例'):
-            out.append('- ' + re.sub(r'\s+', ' ', ls))
+            out.append('- ' + re.sub(r'\s*……\s*\d+\s*$', '', re.sub(r'\s+', ' ', ls)))
     out.append('')
     return out
 
@@ -482,6 +620,7 @@ def main():
     lines = new_lines
 
     # ---- Stage D/E: 图片/视频/图注/表格/公式 ----
+    fig_map = build_fig_map(lines)   # 图片:图注 -> 哈希(供 insert_figures 回插)
     new_lines = []
     for l in lines:
         ls = l.strip()
@@ -491,9 +630,9 @@ def main():
             continue
         if ls == '本章数字资源':
             continue
-        m = re.match(r'^(图\d+-\d+)\s*\u3000*\s*(.*)$', ls)
+        m = re.match(r'^图\s*(\d+-\d+[A-Z]?)\s*[　 \u3000\u2003\u2002\t ]+(.*)$', ls)
         if m and len(m.group(2)) > 0 and not l.startswith('**'):
-            new_lines.append('**%s　%s**' % (m.group(1), m.group(2).strip()))
+            new_lines.append('**图%s　%s**' % (m.group(1), m.group(2).strip()))
             continue
         m = re.match(r'^(表\d+-\d+[A-Z]?)\s*\u3000*\s*(.*)$', ls)
         if m and len(m.group(2)) > 0 and not l.startswith('**'):
@@ -507,6 +646,12 @@ def main():
     text = clean_latex_junk(text)
     text = convert_math(text)
     text = convert_sup_sub(text)
+    # 图片回插(规则 1-5):figX-Y.png + 引用 + 图注加粗
+    text = insert_figures(text, fig_map)
+    # 纯文本 $$ 块去包裹(内容无任何 LaTeX 命令时;Z 评分等真 LaTeX 保留)
+    text = re.sub(r'\$\$\n(.*?)\n\$\$',
+                  lambda m: m.group(1) if '\\' not in m.group(1) else m.group(0),
+                  text, flags=re.S)
 
     # ---- 针对性行修复(对照 PDF 原文核实) ----
     targeted = [
@@ -597,7 +742,7 @@ def main():
     n = len(tmp)
     while i < n:
         l = tmp[i]
-        if re.search(r'[，、；：,;:]\s*$', l):
+        if re.search(r'[，、；：,;:]\s*$', l) or re.search(r'(分为|包括|如下)$', l.strip()):
             j = i + 1
             while j < n and tmp[j] == '':
                 j += 1
@@ -629,6 +774,15 @@ def main():
         out.pop(0)
     while out and out[-1] == '':
         out.pop()
+
+    # ---- 自检(规则 23):图引用/图注/残留 $/哈希引用/base64 ----
+    ft = '\n'.join(out)
+    print('[自检] 图引用=%d 图注=%d $=%d 哈希残留=%d base64=%d' % (
+        len(re.findall(r'!\[图\d+-\d+[A-Z]?-?[a-z]*\]\(images/fig', ft)),
+        len(set(re.findall(r'\*\*图(\d+-\d+[A-Z]?)[　 ]', ft))),
+        len(re.findall(r'\$', ft)),
+        len(re.findall(r'images/[0-9a-f]{20,}\.', ft)),
+        len(re.findall(r'data:image|base64', ft))))
 
     with io.open(OUT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(out) + '\n')

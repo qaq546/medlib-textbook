@@ -72,6 +72,7 @@ def main():
         if re.match(r"^<(/)?(table|tr|td|th)", line): continue
         if re.match(r"^\s*- \[", line): continue
         if line in ("```", "$$", "---"): continue
+        if re.match(r"^(!\[|```)", line): continue
         body = ws(norm(line))
         if len(body) < 8: continue
         if body not in pdf_all:

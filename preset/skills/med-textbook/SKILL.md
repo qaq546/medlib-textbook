@@ -33,6 +33,17 @@ args.json 为 UTF-8 JSON;结果以 JSON 打印到 stdout。`pdf-pages` 与 `ls` 
 3. 一本书所有分片拉完后 `merge-book {libraryDir, book}` → 按页码顺序合并为 `<book>.md`
 4. 清理 `.tmp` 临时目录;`scan-md` 后重建 `_library_index.md`
 
+## 后处理规则(分片 md → 成稿,medfix.py + 校对链)
+
+1. **图片**:只归档带「图X-Y」图注的图块 → `images/figX-Y.png`(+面板后缀 a/b/c),图注行上方插 `![图X-Y](images/figX-Y.png)`,图注加粗 `**图X-Y　图注**` 在图片下方;缺失文件插 `[图X-Y]` 占位符;**禁止 base64 嵌入**;封面/编者照片/logo/二维码/视频缩略图/思维导图等无图注图片剔除
+2. **符号**:`T₁/T₂`、`HCO₃⁻`、`PaCO₂`、`PaO₂`、`CD4⁺`、`P₃/P₅₀/P₉₇` 等一律保留下标/上标(Unicode),不得丢失
+3. **段落**:同一段落中间不插换行;空行只在段落间/标题前后/列表项间;修复「根据病变部位分为\n以下类型」类断段
+4. **目录**:删除原书页码,统一 `- [章节标题](#锚点)`;锚点与正文标题一致
+5. **表格**:简单表用 Markdown 表格;含合并单元格的复杂表用 HTML(rowspan/colspan);表题加粗 `**表X-Y　表名**` 在表格上方
+6. **公式策略**:行内医学符号用 Unicode;真正有数学结构的展示公式保留 `$$...$$` LaTeX(如 Z 评分);纯文本 `$$` 块去包裹;输出前自检无残留 `$`
+7. **术语/层级**:英文术语首现 `（*English term*，ABBR）` 斜体;标题层级 `# 章 / ## 节 / ### 一、 / #### （一）与【】 / ##### 1.`
+8. **输出自检**:图引用数 = 图注数;无残留 `$`、无 base64、无 `images/<hash>` 引用残留
+
 ## 检索与维护
 - `search {libraryDir, query, book?, maxResults?}` → 命中 {book, file, line, text}
 - `scan-md {libraryDir, book?}` → 书单 + 标题层级(索引数据源)
