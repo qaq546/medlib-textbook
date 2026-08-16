@@ -4,6 +4,10 @@
 逐表核对后填写。同一本书用相同 MinerU 模型版本重新转换时输出是确定性的,因此
 这些修复可以**直接重跑并复用**;换书时只需重写数据区。
 
+`fix-common.py` 是**通用字符规范层**,对所有教材直接生效(无需数据区):
+离子上下标(Na⁺/HCO₃⁻/SO₄²⁻…)、数字比值冒号(1:3→1∶3,排除时间/URL)、
+乘号(2x3→2×3)、可选表题加粗(--bold-titles)。
+
 ## 流程
 
 1. 转换:`medlib_convert` → 得到分片 md 与 PDF 逐页文本(`pdfwork/pages/p001.txt`…)
@@ -13,6 +17,9 @@
    残留模式与内容抽查
 4. 跑流水线:`python postprocess.py --md <md> --pages <pages> [--work <work>]`
 5. 校验:verify 全部通过、audit misses 数量不回升即为合格
+
+> 顺序:fix-tables 必须先于 fix-common(书特定 GFM 整块替换须在通用字符层之前,
+> 否则 fix-common 先改比值/括号会使 fix-tables 的匹配块失效)。
 
 ## 引擎函数
 

@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 """postprocess.py — 教材分片 md 后处理流水线驱动(通用模板版)。
 
-把 MinerU 转换出的分片 md 依次跑完五个阶段:
+把 MinerU 转换出的分片 md 依次跑完六个阶段:
   1) fix-tables.py          表格专项修复(合并单元格转 HTML、圈号、上下标、表题加粗)
                             [本书数据内嵌,模板版数据区为空;按 specs/README 填写]
-  2) verify-tables.py       表格结构校验(rowspan/colspan、GFM 列数、残留检查)
-  3) backfill-punct.py      按 PDF 文本层回填行拼接丢失的标点(安全模式)
-  4) audit-para.py          段落级严格包含审计
-  5) audit-para-lenient.py  括号归一审计(区分标点型/内容型差异)
+                            [先于此阶段:书特定 GFM 整块替换,须在通用字符层之前]
+  2) fix-common.py          通用字符规范层(离子上下标、比值冒号、乘号;对所有教材有效)
+  3) verify-tables.py       表格结构校验(rowspan/colspan、GFM 列数、残留检查)
+  4) backfill-punct.py      按 PDF 文本层回填行拼接丢失的标点(安全模式)
+  5) audit-para.py          段落级严格包含审计
+  6) audit-para-lenient.py  括号归一审计(区分标点型/内容型差异)
 
 用法:
   python postprocess.py --md <md 文件> --pages <PDF 逐页 txt 目录> [--work <输出目录>] [--apply-backfill]
@@ -55,6 +57,7 @@ def main():
 
     results = {}
     results["fix-tables"] = run("fix-tables.py", ["--md", md])
+    results["fix-common"] = run("fix-common.py", ["--md", md])
     results["verify-tables"] = run("verify-tables.py", ["--md", md])
     results["backfill-punct"] = run("backfill-punct.py", ["--md", md, "--pages", pages, "--work", work])
     results["audit-para"] = run("audit-para.py", ["--md", md, "--pages", pages, "--work", work])
