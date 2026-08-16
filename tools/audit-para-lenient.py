@@ -1,10 +1,21 @@
 # -*- coding: utf-8 -*-
-"""audit_para_lenient.py — 括号归一后的段落包含审计,用于区分"标点型"与"内容型"差异。"""
-import io, os, re
+"""audit_para_lenient.py — 括号归一后的段落包含审计,用于区分"标点型"与"内容型"差异。
 
-WORK = r"<输出目录,如 work>"
-MD = r"<规范化 md 文件路径>"
-PAGES = r"<PDF 逐页 txt 目录(medfix 的 pdfwork/pages)>"
+用法:python audit-para-lenient.py [--md <md 文件>] [--pages <PDF 逐页 txt 目录>] [--work <输出目录>]
+"""
+import io, os, re, sys
+
+DEFAULT_MD = r"<规范化 md 文件路径>"
+DEFAULT_PAGES = r"<PDF 逐页 txt 目录(medfix 的 pdfwork/pages)>"
+DEFAULT_WORK = r"<输出目录,如 work>"
+
+_args = [a for a in sys.argv[1:]]
+def _arg(name, default):
+    return _args[_args.index(name) + 1] if name in _args else default
+
+WORK = _arg("--work", DEFAULT_WORK)
+MD = _arg("--md", DEFAULT_MD)
+PAGES = _arg("--pages", DEFAULT_PAGES)
 
 SUBS = dict(zip("₀₁₂₃₄₅₆₇₈₉", "0123456789"))
 SUPS = dict(zip("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789"))

@@ -8,14 +8,22 @@
 #   2) 页眉/页码/控制字符从 PDF 侧清理(消除跨页假阳性);
 #   3) 触碰对齐窗口边界的块视为相邻段落文字,忽略;
 #   4) 非标点的"纯插入"块(图注/页码等外来文字)忽略,交给包含验证兜底。
-# 模板:把下方 SRC / OUT / WORK / PAGES 改成你的路径后运行:
-#   python backfill-punct.py
-import io, os, re, difflib
+# 用法:
+#   python backfill-punct.py [--md <md 文件>] [--pages <PDF 逐页 txt 目录>] [--work <输出目录>]
+import io, os, re, difflib, sys
 
-WORK = r"<输出目录,如 work>"
-SRC = os.path.join(WORK, "<规范化 md 文件路径>")
-OUT = os.path.join(WORK, "<输出 md 文件路径>")
-PAGES = r"<PDF 逐页 txt 目录(medfix 的 pdfwork/pages)>"
+DEFAULT_MD = r"<规范化 md 文件路径>"
+DEFAULT_PAGES = r"<PDF 逐页 txt 目录(medfix 的 pdfwork/pages)>"
+DEFAULT_WORK = r"<输出目录,如 work>"
+
+_args = [a for a in sys.argv[1:]]
+def _arg(name, default):
+    return _args[_args.index(name) + 1] if name in _args else default
+
+WORK = _arg("--work", DEFAULT_WORK)
+SRC = _arg("--md", DEFAULT_MD)
+OUT = os.path.join(WORK, os.path.basename(SRC).replace(".md", "-backfilled.md"))
+PAGES = _arg("--pages", DEFAULT_PAGES)
 
 SUBS = dict(zip("₀₁₂₃₄₅₆₇₈₉", "0123456789"))
 SUPS = dict(zip("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789"))

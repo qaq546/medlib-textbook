@@ -1,12 +1,23 @@
 # -*- coding: utf-8 -*-
 """audit_para.py — 段落级全文包含审计:每个 md 非空段落(去空白/去表格/去目录行/去标题)
 经 Unicode 变体归一后,必须作为子串出现在 PDF 文本层(全部 p001-p220 拼接)中。
-未命中的段落即转换/拼接/OCR 疑点。"""
+未命中的段落即转换/拼接/OCR 疑点。
+
+用法:python audit-para.py [--md <md 文件>] [--pages <PDF 逐页 txt 目录>] [--work <输出目录>]
+"""
 import io, os, re, sys
 
-WORK = r"<输出目录,如 work>"
-MD = r"<规范化 md 文件路径>"
-PAGES = r"<PDF 逐页 txt 目录(medfix 的 pdfwork/pages)>"
+DEFAULT_MD = r"<规范化 md 文件路径>"
+DEFAULT_PAGES = r"<PDF 逐页 txt 目录(medfix 的 pdfwork/pages)>"
+DEFAULT_WORK = r"<输出目录,如 work>"
+
+_args = [a for a in sys.argv[1:]]
+def _arg(name, default):
+    return _args[_args.index(name) + 1] if name in _args else default
+
+WORK = _arg("--work", DEFAULT_WORK)
+MD = _arg("--md", DEFAULT_MD)
+PAGES = _arg("--pages", DEFAULT_PAGES)
 
 SUBS = dict(zip("₀₁₂₃₄₅₆₇₈₉", "0123456789"))
 SUPS = dict(zip("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789"))
