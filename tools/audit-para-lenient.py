@@ -58,6 +58,7 @@ def main():
         if not line: continue
         if re.match(r"^#{1,6}\s", line): continue
         if line.startswith("|"): continue
+        if re.match(r"^<(/)?(table|tr|td|th)", line): continue
         if re.match(r"^\s*- \[", line): continue
         if line in ("```", "$$", "---"): continue
         body = ws(norm(line))

@@ -74,6 +74,7 @@ def main():
         # 跳过标题/表格/目录列表/围栏块标记
         if re.match(r"^#{1,6}\s", line): continue
         if line.startswith("|"): continue
+        if re.match(r"^<(/)?(table|tr|td|th)", line): continue
         if re.match(r"^\s*- \[", line): continue
         if line in ("```", "$$", "---"): continue
         if re.match(r"^(!\[|```)", line): continue
