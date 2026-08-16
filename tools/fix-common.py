@@ -91,11 +91,13 @@ def main():
         text = f.read()
     total = 0
     detail = []
-    # 时间格式位置集合(比值冒号需跳过)
-    time_spans = set()
-    for m in TIME_RE.finditer(text):
-        time_spans.add((m.start(), m.end()))
     for name, rx, repl in REPLACERS:
+        # 时间格式位置集合(比值冒号需跳过)。基于当前 text 计算:
+        # 前序替换(如离子上下标)会改变文本长度,预计算区间会漂移。
+        time_spans = set()
+        if name == "比值冒号":
+            for m in TIME_RE.finditer(text):
+                time_spans.add((m.start(), m.end()))
         n = 0
         def _sub(mm, rx=rx, repl=repl, name=name):
             nonlocal n

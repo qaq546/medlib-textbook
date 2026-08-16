@@ -1,0 +1,2 @@
+# 唯一 Python 依赖:medfix.py / round5-fix.py 提取图片转 PNG 时惰性 import fitz
+pymupdf

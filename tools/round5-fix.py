@@ -14,16 +14,16 @@
 """
 import io, re, os, sys, shutil
 
-PYLIBS = r"F:\Develop\DeepSeek-Harness\Agent\Plugins\py-libs"
+PYLIBS = r"<py-libs 目录>"
 if PYLIBS not in sys.path:
     sys.path.insert(0, PYLIBS)
 
 WORK = os.path.join(PYLIBS, "work")
-RAW = os.path.join(WORK, "24儿科学 第10版-p1-200-raw.md")
-SRC_MD = os.path.join(WORK, "24儿科学 第10版-p1-200-round4-backfilled.md")  # 纯净第 4 轮底稿
-MD = r"F:\Develop\MedicalTextbooks\md\24儿科学 第10版\24儿科学 第10版-p1-200.md"  # 书目录交付文件(拷贝目标)
-OUT = os.path.join(WORK, "24儿科学 第10版-p1-200-round5.md")
-IMG_DIR = r"F:\Develop\MedicalTextbooks\md\24儿科学 第10版\images"   # 哈希原图来源
+RAW = os.path.join(WORK, "<书名>-p1-200-raw.md")
+SRC_MD = os.path.join(WORK, "<书名>-p1-200-round4-backfilled.md")  # 纯净第 4 轮底稿
+MD = r"<书目录>\<书名>-p1-200.md"  # 书目录交付文件(拷贝目标)
+OUT = os.path.join(WORK, "<书名>-p1-200-round5.md")
+IMG_DIR = r"<书目录>\images"   # 哈希原图来源
 FIG_OUT = os.path.join(WORK, "figs")                                  # 转换产物暂存
 REPORT = os.path.join(WORK, "图片分类报告.txt")
 
@@ -348,7 +348,7 @@ def main():
     print('残留哈希引用:', len(hash_left), ' base64:', len(b64))
     print('目录去页码行数:', toc_fixed)
 
-    with io.open(OUT, 'w', encoding='utf-8') as f:
+    with io.open(OUT, 'w', encoding='utf-8', newline='\n') as f:
         f.write(final_text + '\n')
     print('written:', OUT, 'lines:', len(out))
 

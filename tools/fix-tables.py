@@ -5,7 +5,8 @@
 引擎函数保留在下方;【本书数据区】需要按目标书的 PDF 文本层逐表核对后填写
 (参考 specs/README.md 与 specs/_template.py)。
 
-用法:python fix-tables.py [--md <md 文件>]
+用法:python fix-tables.py [--md <md 文件>] [--strict]
+--strict:任一规则跳过即 exit 1(数据区填写后建议开启,防止静默漏修)。
 """
 import io, re, sys
 
@@ -13,6 +14,7 @@ DEFAULT_MD = r"<md 文件路径>"
 
 _args = [a for a in sys.argv[1:]]
 MD = _args[_args.index("--md") + 1] if "--md" in _args else DEFAULT_MD
+STRICT = "--strict" in _args
 
 with io.open(MD, "r", encoding="utf-8") as f:
     lines = f.read().split("\n")
@@ -124,3 +126,6 @@ if skipped:
     print("--- 跳过 %d 处(已应用或未命中,未修改) ---" % len(skipped))
     for s in skipped:
         print("SKIP:", s)
+    if STRICT:
+        print("=== --strict:%d 处跳过,判定失败 ===" % len(skipped))
+        sys.exit(1)

@@ -9,6 +9,8 @@ library/
 文库/
 medlib-library/
 *.md.tmp
+*.pdf
+*.epub
 
 # ---- 运行时临时产物 ----
 work/

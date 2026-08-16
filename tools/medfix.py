@@ -4,12 +4,12 @@
 纯文本 $$ 块去包裹;图注兼容 '图 X-Y' 空格形态;输出前自检。"""
 import io, re, os, json, shutil
 
-WORK = r"F:\Develop\DeepSeek-Harness\Agent\Plugins\py-libs\work"
-SRC = os.path.join(WORK, "24儿科学 第10版-p1-200-raw.md")
-OUT = os.path.join(WORK, "24儿科学 第10版-p1-200-norm.md")
-OUTLINE = r"F:\Develop\DeepSeek-Harness\Agent\Plugins\py-libs\pdfwork\outline.json"
+WORK = r"<工作目录,如 ...\py-libs\work>"
+SRC = os.path.join(WORK, "<书名>-p1-200-raw.md")
+OUT = os.path.join(WORK, "<书名>-p1-200-norm.md")
+OUTLINE = r"<pdfwork 目录>\outline.json"
 # MinerU 哈希原图目录 / fig 图片输出目录(按书修改)
-IMG_SRC = r"F:\Develop\MedicalTextbooks\md\24儿科学 第10版\images"
+IMG_SRC = r"<书名目录>\images"
 IMG_DST = IMG_SRC
 
 # ---------- 工具函数 ----------
@@ -784,7 +784,7 @@ def main():
         len(re.findall(r'images/[0-9a-f]{20,}\.', ft)),
         len(re.findall(r'data:image|base64', ft))))
 
-    with io.open(OUT, 'w', encoding='utf-8') as f:
+    with io.open(OUT, 'w', encoding='utf-8', newline='\n') as f:
         f.write('\n'.join(out) + '\n')
     print('written', OUT, 'lines:', len(out))
 

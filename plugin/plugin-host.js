@@ -7,14 +7,14 @@ return {
     const shell = ctx.shell
 
     // ---------- configuration (workspace-local defaults; overridable via medlib_setup) ----------
-    const WORKSPACE = 'F:/Develop/DeepSeek-Harness/Agent/Plugins'
+    const WORKSPACE = '<YOUR_WORKSPACE_DIR>'   // 按需替换为本机路径(或经 medlib_setup 覆盖)
     // Sandbox temp dir — writable under ANY workspace-write policy (os.tmpdir()).
-    const TMP = 'C:/Users/fu\'bi\'yan/AppData/Local/Temp/dsh-D1L5fg'
+    const TMP = '<YOUR_TMP_DIR>'
     const DEFAULT = {
-      bridge: 'F:/Develop/DeepSeek-Harness/Agent/Plugins/medlib-proto/medlib-bridge.mjs',
-      workDir: 'F:/Develop/DeepSeek-Harness/Agent/Plugins/medlib-proto/work',
-      libraryDir: 'F:/Develop/DeepSeek-Harness/Agent/Plugins/medlib-library',
-      configFile: 'F:/Develop/DeepSeek-Harness/Agent/Plugins/medlib-proto/config.json',
+      bridge: '<YOUR_BRIDGE_DIR>/medlib-bridge.mjs',
+      workDir: '<YOUR_BRIDGE_DIR>/work',
+      libraryDir: '<YOUR_LIBRARY_DIR>',
+      configFile: '<YOUR_BRIDGE_DIR>/config.json',
     }
     const EXT = /\.(pdf|docx?|pptx?|xlsx?|png|jpe?g|webp|gif|bmp|jp2)$/i
     // workspace-write + explicit root: session workspace for workspace files,
@@ -86,7 +86,7 @@ return {
     // medlib_setup: store token (+ optional library dir)
     makeTool(
       'medlib_setup',
-      '配置医学教材文库:保存 MinerU API Token(必填)与文库根目录(可选,默认 F:/Develop/DeepSeek-Harness/Agent/Plugins/medlib-library)。Token 获取: https://mineru.net/apiManage/token',
+      '配置医学教材文库:保存 MinerU API Token(必填)与文库根目录(可选,默认见 DEFAULT.libraryDir 常量)。Token 获取: https://mineru.net/apiManage/token',
       {
         token: { type: 'string', description: 'MinerU API Token(Bearer 后面的部分)', required: true },
         libraryDir: { type: 'string', description: '文库根目录(可省略,用默认值)' },

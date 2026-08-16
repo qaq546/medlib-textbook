@@ -110,7 +110,7 @@ def main():
     pdf_all = ws(norm("\n".join(
         clean_page(io.open(os.path.join(PAGES, "p%03d.txt" % p), encoding="utf-8").read())
         for p in range(1, 1000)
-        if os.path.exists(os.path.join(PAGES, "p%03d.txt" % p))))
+        if os.path.exists(os.path.join(PAGES, "p%03d.txt" % p)))))
 
     paras = md.split("\n\n")
     fixed, skipped, fixed_detail = [], [], []
@@ -122,6 +122,8 @@ def main():
             out_paras.append(para)
             continue
         if re.match(r"^#{1,6}\s", line):
+            out_paras.append(para); continue
+        if re.match(r"^(!\[|```)", line):
             out_paras.append(para); continue
         if line.startswith("|"):
             out_paras.append(para); continue
