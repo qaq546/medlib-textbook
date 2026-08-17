@@ -53,7 +53,7 @@
 
 ## 5. 新会话怎么用（两种方式）
 
-- **方式 A（preset 模式）**：新建会话时选择「医学教材电子化」preset（已安装到 `~/.dsh/.agent-presets/med-textbook/`），agent 自动带 skill、按本流程走。
+- **方式 A（preset 模式）**：新建会话时选择「医学教材电子化」preset（已安装到 `~/.dsh/.agent-presets/med-textbook/`），agent 自动带 skill、按本流程走。注意：preset 是否生效看**会话 header 的 `agentPreset` 字段**（`~/.dsh/sessions/.../session.jsonl.zstd` 首行），不是看 GUI 下拉框；若改了 `agent.cordis.yml` 需**重启 DSH** 才会重新挂载。
 - **方式 B（工作区模式，用户主推）**：把本 AGENT.md 复制到新工作区，连同要解析的教材一起放入；agent 读本文件按流程执行。
 - 两种方式下：文库在会话工作区外，首次写入需用户批准一次（沙箱升级）；preset/skill 只含流程知识，机器路径以 `medlib-proto\config.json` 为准。
 
@@ -71,3 +71,5 @@
 - polish 幂等性依赖稳定输入；人为改过 md 后再跑 polish 需重新核对报告数字。
 - 图片当前为 `.jpg`（儿科学样例为 `.png`）；如需统一格式可后处理转换（可选，未做）。
 - git 提交到公共仓库前，必须清掉所有 `F:\Develop` 本地路径（已发生过一次泄漏，靠 grep 拦截）。
+- DSH 技能目录为空/只有无关 skill 时：先确认 preset 的 `agent.cordis.yml` 里 `skill-filesystem` 行带 `customSkillDirs` 指向 preset 自带的 `skills/` 目录（对照 shipped `cordis` preset 的写法），缺了它预设捆绑的 skill 永远不会被扫描；其次确认会话 header 的 `agentPreset` 字段确实是本 preset（GUI 下拉 ≠ 已生效）。改完需重启 DSH。
+- DSH 会把 `~/.agents/skills`（默认 agentsHome）里的 skill 也扫进目录——那里可能出现与 DSH 无关的历史 skill（如给 Claude Code 装的），属正常，不代表本 preset 有问题。
