@@ -1,6 +1,7 @@
 # 医学教材电子化(Medlib)
 
 > 日常使用说明见 QUICKSTART.md(新会话怎么用、常用操作小抄)。
+> 项目记忆文件:仓库根目录 `AGENT.md`(标准流程/归档/QA 以它为准),本文件是桥接命令速查。
 
 把医学教材(PDF/PPT/Word/图片)通过 MinerU 云端 API 转成 Markdown 文库,支持全文检索与按章查阅。
 
@@ -18,7 +19,7 @@ node "<preset>/assets/medlib-bridge.mjs" <verb> <args.json>
 ```
 args.json 为 UTF-8 JSON;结果以 JSON 打印到 stdout。`pdf-pages` 与 `ls` 可直接传裸路径(<args.json> 位置放路径,解析失败时视为 path 参数)。
 
-## 转换工作流(转换 → 轮询 → 拉取)
+## 转换工作流(转换 → 轮询 → 拉取 → 整饰)
 ### 1) 转换(等价 medlib_convert)
 1. 收集文件:`ls {path}` → files[].path;过滤扩展名 pdf/doc/docx/ppt/pptx/xls/xlsx/png/jpg/jpeg/webp/gif/bmp/jp2
 2. 分片:PDF 用 `pdf-pages` 估页数;>200 页按 200 一档生成 pageRanges("1-200","201-400",…);≤200 页用单条(不带 pageRanges);每片是一个独立 dataId
@@ -31,7 +32,15 @@ args.json 为 UTF-8 JSON;结果以 JSON 打印到 stdout。`pdf-pages` 与 `ls` 
 1. `st-fetch-one {token, fullZipUrl, destDir}` → 下载 zip 并用 tar 解压到 destDir
 2. `st-arrange {libraryDir, book, chunkLabel, srcDir}` → md 归入 `<文库>/<book>/<book>[-pX-Y].md`,图片归入 `images/`(相对路径引用,Obsidian/VS Code 可直接打开)
 3. 一本书所有分片拉完后 `merge-book {libraryDir, book}` → 按页码顺序合并为 `<book>.md`
-4. 清理 `.tmp` 临时目录;`scan-md` 后重建 `_library_index.md`
+4. 清理 `.tmp` 临时目录;重建索引:`node tools/finalize2.mjs <libraryDir>`(或 MEDLIB_LIB 环境变量)
+### 4) 整饰(成品化,关键步骤)
+1. 书签提取(供插章标题):`python <preset>/assets/pdf-bookmarks.py <pdf> <out.json>`(依赖 pymupdf)
+2. 跑 polish(桥接 `polish` 动词,或直接 `node <preset>/assets/polish-book.mjs <libraryDir> <book> [bookmarks.json] [pdfPath]`):
+   - 二维码/数字资源小图剔除(思考题解题思路/本章目标测试/思维导图/三维模型/数字人/视频缩略图等无图注图)
+   - 图注分组绑定 `figX-Y` + 面板 `-a/-b/-c`(与 A./B. 标签交错)
+   - 缺失图注插 `[图X-Y]` 占位符;未被引用的孤儿图片文件清理
+   - 幂等:重复运行零变更
+3. QA 自检:0 哈希引用残留、图引用数 = images 文件数、无残留 `$`、无 base64;`## 思考题` 数 = 章数(用 grep 复核,勿信 PowerShell 正则计数)
 
 ## 后处理规则(分片 md → 成稿,medfix.py + 校对链)
 
@@ -57,3 +66,4 @@ args.json 为 UTF-8 JSON;结果以 JSON 打印到 stdout。`pdf-pages` 与 `ls` 
 - 扫描版 PDF 加 `isOcr:true`;语言默认 ch
 - 图偶尔方向翻转是云端偶发,可人工旋转后同名覆盖 images/ 下文件
 - 沙箱:文库目录在会话工作区外时,首次写入需要用户批准一次(sandbox 升级)
+- 过程产物(MinerU json/备份/各轮报告)归档到 `<文库上一级>/process/<书名>/`,不入 git

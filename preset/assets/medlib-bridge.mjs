@@ -273,6 +273,12 @@ const verbs = {
   'st-fetch-one': async (a) => ({ ok: true, ...(await stFetchOne(a)) }),
   'st-arrange': (a) => ({ ok: true, ...stArrange(a) }),
   'merge-book': (a) => ({ ok: true, ...mergeBook(a) }),
+  'polish': async (a) => {
+    // 成品化后处理：封面去重、书签章标题、目录锚点、标题层级、figX-Y 图片、二维码小图剔除、孤儿文件清理
+    // a: { libraryDir, book, bookmarksPath?, pdfPath? }（pdfPath 缺省时跳过章标题插入）
+    const { polishBook } = await import('./polish-book.mjs')
+    return { ok: true, ...polishBook(a) }
+  },
   'scan-md': (a) => ({ ok: true, books: scanMd(a) }),
   'search': (a) => ({ ok: true, ...search(a) }),
   'ls': (a) => ({ ok: true, files: lsRec(a.path, a.depth || 4) }),
