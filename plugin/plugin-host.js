@@ -253,6 +253,7 @@ return {
 
         const fetched = []
         const mergedBooks = []
+        const polishedBooks = []
         for (const t of ready) {
           const dest = cfg.libraryDir + '/.tmp/' + t.taskId
           const fr = await runBridge(cfg, 'st-fetch-one', { token, fullZipUrl: t.fullZipUrl, destDir: dest }, { timeoutMs: 15 * 60 * 1000, token, policy: 'library' })
@@ -271,7 +272,15 @@ return {
           const allDone = Object.values(st.tasks).filter((t) => t.book === b).every((t) => t.fetched || t.state === 'failed')
           if (allDone) {
             const mg = await runBridge(cfg, 'merge-book', { libraryDir: cfg.libraryDir, book: b }, { timeoutMs: 60000, policy: 'library' })
-            if (mg.ok && st.books[b]) { st.books[b].merged = true; st.books[b].mdPath = mg.merged; mergedBooks.push({ book: b, mdPath: mg.merged, chunks: mg.chunkFiles }) }
+            if (mg.ok && st.books[b]) {
+              st.books[b].merged = true; st.books[b].mdPath = mg.merged; mergedBooks.push({ book: b, mdPath: mg.merged, chunks: mg.chunkFiles })
+              // 自动成品化后处理（封面去重/章标题/目录锚点/层级/figX-Y 图片/二维码小图剔除），需原版 PDF 提取书签
+              const srcPdf = st.books[b].sourceFile && /\.pdf$/i.test(st.books[b].sourceFile) ? st.books[b].sourceFile : undefined
+              try {
+                const pr = await runBridge(cfg, 'polish', { libraryDir: cfg.libraryDir, book: b, pdfPath: srcPdf }, { timeoutMs: 180000, policy: 'library' })
+                if (pr.ok && srcPdf) polishedBooks.push({ book: b, chapters: pr.chaptersFound, inserted: (pr.steps.chapters || {}).inserted, toc: (pr.steps.toc || {}).entries })
+              } catch { /* polish 失败不阻断拉取流程 */ }
+            }
           }
         }
         await writeState(cfg, st)
@@ -279,7 +288,7 @@ return {
         await runBridge(cfg, 'clean', { dir: cfg.libraryDir }, { timeoutMs: 30000, policy: 'library' })
         // rebuild index
         const idx = await buildIndex(cfg)
-        return ok({ fetched, merged: mergedBooks, indexUpdated: idx, next: '可用 medlib_search 检索文库' })
+        return ok({ fetched, merged: mergedBooks, polished: polishedBooks, indexUpdated: idx, next: '可用 medlib_search 检索文库' })
       }
     )
 
@@ -327,6 +336,24 @@ return {
         if (!r.ok) return bad('TRIM_FAIL', r.error ? r.error.msg : '清理失败')
         const idx = await buildIndex(cfg)
         return ok({ report: r.report, indexUpdated: idx })
+      }
+    )
+
+    // medlib_polish: 对已合并的书籍做成品化后处理（对齐儿科学样例质量）
+    makeTool(
+      'medlib_polish',
+      '对已合并的教材 Markdown 做成品化后处理(对齐《儿科学 第10版》样例):封面去重+版权页合并、依据 PDF 官方书签补全"# 第X章"章标题、标题层级规范化(章#/节##/一、###/（一）####/1.#####/【】####)、生成带锚点链接的目录、图片归档 figX-Y(-a/-b 面板)并加粗图注、剔除二维码/视频缩略图/章节思维导图/数字人案例等数字资源小图及其标签、清理未被引用的孤儿图片文件。需提供 pdfPath 以便提取书签(否则跳过章标题插入)。幂等可重复运行。',
+      {
+        book: { type: 'string', description: '文库中的书名(目录名)', required: true },
+        pdfPath: { type: 'string', description: '原版 PDF 路径,用于提取官方书签(章标题与锚句);不提供则跳过章标题插入' },
+      },
+      async (args) => {
+        const cfg = await readConfig()
+        const r = await runBridge(cfg, 'polish', { libraryDir: cfg.libraryDir, book: args.book, pdfPath: args.pdfPath }, { timeoutMs: 180000, policy: 'library' })
+        if (!r.ok) return bad('POLISH_FAIL', r.error ? r.error.msg : '后处理失败')
+        const idx = await buildIndex(cfg)
+        const f = r.steps.figures || {}
+        return ok({ report: { chapters: r.chaptersFound, inserted: (r.steps.chapters || {}).inserted, tocEntries: (r.steps.toc || {}).entries, figures: f.imagesBound, groups: f.groupsBound, qrRemoved: f.junkRemoved, labelsCleaned: f.junkLabelsCleaned, filesCleaned: f.filesDeleted, bytes: r.bytes }, indexUpdated: idx })
       }
     )
 
