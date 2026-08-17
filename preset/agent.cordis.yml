@@ -80,8 +80,15 @@
 # `skill-filesystem` contributes local-root discovery for agents on this preset, and
 # `tool-skill` gives them the catalog and loader; the merged catalog also
 # carries whatever the deployment registered globally (repository plugins).
+#
+# `customSkillDirs` points at the preset's OWN `skills/` directory (same idiom
+# as the shipped `cordis` preset): without it, the preset's bundled skills are
+# never scanned and its skill catalog stays empty.
 - id: skill-filesystem
   name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    customSkillDirs:
+      - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
